@@ -101,7 +101,6 @@
 <body>
     <div class="container">
         <div class="branding">
-         
             <h2>ISRC - International STEM & Robotic Championship</h2>
         </div>
         <h1>Bulk Email Sender</h1>
@@ -111,7 +110,9 @@
             <input type="radio" id="manualEntry" name="entryMode" value="manual" checked>
             <label for="manualEntry">Enter Subject and Message</label><br>
             <input type="radio" id="useTemplate" name="entryMode" value="template">
-            <label for="useTemplate">Use Template</label>
+            <label for="useTemplate">Use Template</label><br>
+            <input type="radio" id="sendWithoutSubject" name="entryMode" value="noSubjectBody">
+            <label for="sendWithoutSubject">Send Without Subject and Body</label>
         </div>
         
         <div id="manualEntryForm">
@@ -146,6 +147,7 @@
 
         document.getElementById('manualEntry').addEventListener('change', updateFormVisibility);
         document.getElementById('useTemplate').addEventListener('change', updateFormVisibility);
+        document.getElementById('sendWithoutSubject').addEventListener('change', updateFormVisibility);
 
         function updateFormVisibility() {
             const manualEntryForm = document.getElementById('manualEntryForm');
@@ -153,10 +155,13 @@
             if (document.getElementById('manualEntry').checked) {
                 manualEntryForm.style.display = 'block';
                 templateForm.style.display = 'none';
-            } else {
+            } else if (document.getElementById('useTemplate').checked) {
                 manualEntryForm.style.display = 'none';
                 templateForm.style.display = 'block';
                 loadTemplates();
+            } else {
+                manualEntryForm.style.display = 'none';
+                templateForm.style.display = 'none';
             }
         }
 
@@ -180,7 +185,7 @@
             const subject = document.getElementById('subject').value;
             const message = document.getElementById('message').value;
             const templateSelect = document.getElementById('templateSelect');
-            const useTemplate = document.getElementById('useTemplate').checked;
+            const sendWithoutSubject = document.getElementById('sendWithoutSubject').checked;
 
             if (!emailList) {
                 alert('Please paste email addresses.');
@@ -188,14 +193,17 @@
             }
 
             let emailSubject, emailMessage;
-            if (useTemplate) {
+            if (sendWithoutSubject) {
+                emailSubject = '';
+                emailMessage = '';
+            } else if (document.getElementById('useTemplate').checked) {
                 if (!templateSelect.value) {
                     alert('Please select a template.');
                     return;
                 }
                 const selectedTemplate = JSON.parse(localStorage.getItem('templates')).find(template => template.name === templateSelect.value);
-                emailSubject = selectedTemplate.subject;
-                emailMessage = selectedTemplate.message;
+                emailSubject = selectedTemplate.subject || '';
+                emailMessage = selectedTemplate.message || '';
             } else {
                 if (!subject || !message) {
                     alert('Please provide a subject and message.');
@@ -257,12 +265,16 @@
             const templates = JSON.parse(localStorage.getItem('templates')) || [];
             const templateSelect = document.getElementById('templateSelect');
             templateSelect.innerHTML = '<option value="">Select a template</option>'; // Reset options
-            templates.forEach(template => {
+            templates.forEach((template) => {
                 const option = document.createElement('option');
                 option.value = template.name;
                 option.textContent = template.name;
                 templateSelect.appendChild(option);
             });
+
+            if (templates.length > 0) {
+                templateSelect.value = templates[0].name; // Auto-select the first template
+            }
         }
 
         function deleteEmail(index) {
