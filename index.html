@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bulk Email Sender | ISRC</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f0f2f5;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            color: #333;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 800px;
+            margin-top: 20px;
+        }
+        h1, h2 {
+            color: #007BFF;
+            text-align: center;
+        }
+        textarea, input[type="text"], select {
+            width: 100%;
+            margin-bottom: 15px;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+        button {
+            padding: 12px 25px;
+            background-color: #007BFF;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .history {
+            margin-top: 30px;
+            padding: 15px;
+            background-color: #f9f9f9;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .history ul {
+            list-style: none;
+            padding: 0;
+        }
+        .history li {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            padding: 10px;
+            background: #fff;
+            border-radius: 5px;
+            border: 1px solid #ddd;
+        }
+        .history button {
+            background-color: #FF6F61;
+            margin-left: 10px;
+        }
+        .history button:hover {
+            background-color: #e55d46;
+        }
+        .history .clear-button {
+            background-color: #FF9F00;
+            margin-top: 10px;
+        }
+        .history .clear-button:hover {
+            background-color: #e68900;
+        }
+        .branding {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .branding img {
+            max-width: 200px;
+            margin-right: 20px;
+        }
+        .branding h2 {
+            font-size: 24px;
+            margin: 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="branding">
+         
+            <h2>ISRC - International STEM & Robotic Championship</h2>
+        </div>
+        <h1>Bulk Email Sender</h1>
+        <textarea id="emailList" rows="10" placeholder="Paste email addresses here, one per line"></textarea>
+        
+        <div>
+            <input type="radio" id="manualEntry" name="entryMode" value="manual" checked>
+            <label for="manualEntry">Enter Subject and Message</label><br>
+            <input type="radio" id="useTemplate" name="entryMode" value="template">
+            <label for="useTemplate">Use Template</label>
+        </div>
+        
+        <div id="manualEntryForm">
+            <input type="text" id="subject" placeholder="Subject">
+            <textarea id="message" rows="6" placeholder="Message Body"></textarea>
+        </div>
+        
+        <div id="templateForm" style="display: none;">
+            <select id="templateSelect">
+                <option value="">Select a template</option>
+            </select>
+        </div>
+        
+        <button onclick="sendNextEmail()">Send Next Email</button>
+        
+        <h2>Create New Template</h2>
+        <input type="text" id="templateName" placeholder="Template Name">
+        <input type="text" id="templateSubject" placeholder="Template Subject">
+        <textarea id="templateMessage" rows="6" placeholder="Template Message Body"></textarea>
+        <button onclick="saveTemplate()">Save Template</button>
+
+        <div class="history">
+            <h2>Send History</h2>
+            <ul id="historyList"></ul>
+            <button class="clear-button" onclick="clearHistory()">Clear All</button>
+        </div>
+    </div>
+
+    <script>
+        let emailQueue = [];
+        let currentIndex = 0;
+
+        document.getElementById('manualEntry').addEventListener('change', updateFormVisibility);
+        document.getElementById('useTemplate').addEventListener('change', updateFormVisibility);
+
+        function updateFormVisibility() {
+            const manualEntryForm = document.getElementById('manualEntryForm');
+            const templateForm = document.getElementById('templateForm');
+            if (document.getElementById('manualEntry').checked) {
+                manualEntryForm.style.display = 'block';
+                templateForm.style.display = 'none';
+            } else {
+                manualEntryForm.style.display = 'none';
+                templateForm.style.display = 'block';
+                loadTemplates();
+            }
+        }
+
+        function loadHistory() {
+            const processedEmails = JSON.parse(localStorage.getItem('processedEmails')) || [];
+            const historyList = document.getElementById('historyList');
+            historyList.innerHTML = '';
+            processedEmails.forEach((email, index) => {
+                const li = document.createElement('li');
+                li.textContent = email;
+                const deleteButton = document.createElement('button');
+                deleteButton.textContent = 'Delete';
+                deleteButton.onclick = () => deleteEmail(index);
+                li.appendChild(deleteButton);
+                historyList.appendChild(li);
+            });
+        }
+
+        async function sendNextEmail() {
+            const emailList = document.getElementById('emailList').value.trim();
+            const subject = document.getElementById('subject').value;
+            const message = document.getElementById('message').value;
+            const templateSelect = document.getElementById('templateSelect');
+            const useTemplate = document.getElementById('useTemplate').checked;
+
+            if (!emailList) {
+                alert('Please paste email addresses.');
+                return;
+            }
+
+            let emailSubject, emailMessage;
+            if (useTemplate) {
+                if (!templateSelect.value) {
+                    alert('Please select a template.');
+                    return;
+                }
+                const selectedTemplate = JSON.parse(localStorage.getItem('templates')).find(template => template.name === templateSelect.value);
+                emailSubject = selectedTemplate.subject;
+                emailMessage = selectedTemplate.message;
+            } else {
+                if (!subject || !message) {
+                    alert('Please provide a subject and message.');
+                    return;
+                }
+                emailSubject = subject;
+                emailMessage = message;
+            }
+
+            if (emailQueue.length === 0) {
+                emailQueue = emailList.split('\n').map(email => email.trim()).filter(email => email);
+                const processedEmails = JSON.parse(localStorage.getItem('processedEmails')) || [];
+                emailQueue = emailQueue.filter(email => !processedEmails.includes(email));
+                localStorage.setItem('processedEmails', JSON.stringify(processedEmails));
+                currentIndex = 0;
+            }
+
+            if (currentIndex >= emailQueue.length) {
+                alert('All emails have been sent.');
+                return;
+            }
+
+            const email = emailQueue[currentIndex];
+            const mailtoLink = `https://mail.google.com/mail/?view=cm&fs=1&to=${email}&su=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailMessage)}`;
+            
+            window.open(mailtoLink, '_blank');
+            
+            const processedEmails = JSON.parse(localStorage.getItem('processedEmails')) || [];
+            processedEmails.push(email);
+            localStorage.setItem('processedEmails', JSON.stringify(processedEmails));
+
+            currentIndex++;
+            loadHistory();
+        }
+
+        function saveTemplate() {
+            const templateName = document.getElementById('templateName').value;
+            const templateSubject = document.getElementById('templateSubject').value;
+            const templateMessage = document.getElementById('templateMessage').value;
+
+            if (!templateName || !templateSubject || !templateMessage) {
+                alert('Please fill in all template fields.');
+                return;
+            }
+
+            const templates = JSON.parse(localStorage.getItem('templates')) || [];
+            templates.push({ name: templateName, subject: templateSubject, message: templateMessage });
+            localStorage.setItem('templates', JSON.stringify(templates));
+
+            document.getElementById('templateName').value = '';
+            document.getElementById('templateSubject').value = '';
+            document.getElementById('templateMessage').value = '';
+            
+            alert('Template saved.');
+            loadTemplates();
+        }
+
+        function loadTemplates() {
+            const templates = JSON.parse(localStorage.getItem('templates')) || [];
+            const templateSelect = document.getElementById('templateSelect');
+            templateSelect.innerHTML = '<option value="">Select a template</option>'; // Reset options
+            templates.forEach(template => {
+                const option = document.createElement('option');
+                option.value = template.name;
+                option.textContent = template.name;
+                templateSelect.appendChild(option);
+            });
+        }
+
+        function deleteEmail(index) {
+            const processedEmails = JSON.parse(localStorage.getItem('processedEmails')) || [];
+            processedEmails.splice(index, 1);
+            localStorage.setItem('processedEmails', JSON.stringify(processedEmails));
+            loadHistory();
+        }
+
+        function clearHistory() {
+            localStorage.setItem('processedEmails', JSON.stringify([]));
+            loadHistory();
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            loadHistory();
+            loadTemplates();
+        });
+    </script>
+</body>
+</html>
